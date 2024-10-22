@@ -24,7 +24,12 @@ def scan_wifi():
                     break
             networks.append((mac_address, ssid))
 
-    logging.info("Scan des réseaux Wi-Fi terminé.")
+    # Enregistrement des réseaux scannés dans networks.txt
+    with open("networks.txt", "w") as f:
+        for network in networks:
+            f.write(f"{network[0]} - {network[1]}\n")
+
+    logging.info("Scan des réseaux Wi-Fi terminé et résultats enregistrés dans networks.txt.")
     return networks
 
 def capture_handshake(ap_address):
