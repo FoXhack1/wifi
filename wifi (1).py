@@ -1,25 +1,41 @@
-from scapy.all import *
+import scapy.all as scapy
+from scapy.layers.dot11 import Dot11, Dot11Beacon, Dot11Elt
+import logging
 
-# Définition de la fonction pour scanner les réseaux
-def scan_networks():
-    # Création d'une liste pour stocker les adresses MAC
-    mac_addresses = []
+# Configuration du logging
+logging.basicConfig(level=logging.INFO)
 
-    # Scan des réseaux
-    for packet in sniff(iface="wlan1", count=100):
-        # Vérification si le paquet est un paquet ARP
-        if packet.haslayer(ARP):
-            # Récupération de l'adresse MAC
-            mac_address = packet.hwsrc
-            # Ajout de l'adresse MAC à la liste
-            mac_addresses.append(mac_address)
+def scan_wifi():
+    # Définition de l'interface réseau à utiliser
+    interface = "wlan1"  # Remplacez par votre interface réseau Wi-Fi
 
-    # Retour de la liste des adresses MAC
-    return mac_addresses
+    # Scan des réseaux Wi-Fi
+    logging.info("Début du scan des réseaux Wi-Fi...")
+    packets = scapy.sniff(iface=interface, count=100, timeout=10)
 
-# Appel de la fonction pour scanner les réseaux
-mac_addresses = scan_networks()
+    # Récupération des informations des réseaux Wi-Fi
+    networks = []
+    for packet in packets:
+        if packet.haslayer(Dot11Beacon):
+            # Récupération de l'adresse MAC du réseau
+            mac_address = packet[Dot11].addr3
 
-# Affichage des adresses MAC
-for mac_address in mac_addresses:
-    print(mac_address)
+            # Récupération du nom du réseau
+            ssid = None
+            for elt in packet[Dot11Elt]:
+                if elt.ID == 0:
+                    ssid = elt.info.decode("utf-8")
+                    break
+
+            # Ajout du réseau à la liste
+            networks.append((mac_address, ssid))
+
+    # Sauvegarde des informations dans un fichier .txt
+    with open("networks.txt", "w") as f:
+        for network in networks:
+            f.write(f"{network[0]} - {network[1]}\n")
+
+    logging.info("Scan des réseaux Wi-Fi terminé.")
+
+if __name__ == "__main__":
+    scan_wifi()
